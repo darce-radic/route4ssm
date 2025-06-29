@@ -1,0 +1,133 @@
+account:
+  allow_deletion: true
+  allow_signup: true
+
+convert_legacy_config: false
+
+database:
+  user: route4ssm
+  password: route4ssm_password
+  host: postgres
+  port: "5432"
+  dialect: postgres
+  database: route4ssm
+
+email:
+  enabled: true
+  optional: true
+  acquire_on_registration: true
+  acquire_on_login: false
+  require_verification: true
+  limit: 100
+  use_as_login_identifier: true
+  max_length: 100
+  use_for_authentication: true
+  passcode_ttl: 300
+
+email_delivery:
+  enabled: true
+  from_address: noreply@hanko.io
+  from_name: Hanko
+  smtp:
+    host: localhost
+    port: "465"
+
+log:
+  log_health_and_metrics: true
+
+passkey:
+  enabled: true
+  optional: false
+  acquire_on_registration: always
+  acquire_on_login: always
+  attestation_preference: direct
+  user_verification: preferred
+  limit: 100
+
+password:
+  enabled: true
+  optional: false
+  acquire_on_registration: always
+  acquire_on_login: never
+  recovery: true
+  min_length: 8
+
+rate_limiter:
+  enabled: true
+  store: in_memory
+  passcode_limits:
+    tokens: 3
+    interval: 1m
+  password_limits:
+    tokens: 3
+    interval: 1m
+  token_limits:
+    tokens: 3
+    interval: 1m
+
+saml:
+  enabled: false
+
+secrets:
+  keys:
+    - "your-secret-key-min-16-chars"
+
+server:
+  public:
+    cors:
+      allow_origins:
+        - "http://localhost:63342"
+        - "http://localhost:8888"
+        - "http://localhost:8000"
+  admin:
+    cors:
+      allow_origins:
+        - "http://localhost:63342"
+        - "http://localhost:8888"
+        - "http://localhost:8000"
+
+service:
+  name: Hanko Authentication Service
+
+session:
+  lifespan: 1h
+  enable_auth_token_header: false
+
+third_party:
+  providers:
+    apple:
+      enabled: false
+    discord:
+      enabled: false
+    github:
+      enabled: false
+    google:
+      enabled: false
+    linkedin:
+      enabled: false
+    microsoft:
+      enabled: false
+
+username:
+  enabled: false
+  optional: true
+  acquire_on_registration: true
+  acquire_on_login: true
+  use_as_login_identifier: true
+  min_length: 3
+  max_length: 32
+
+webauthn:
+  timeouts:
+    registration: 60000
+    login: 60000
+  relying_party:
+    id: localhost
+    origins:
+      - "http://localhost:63342"
+      - "http://localhost:8888"
+      - "http://localhost:8000"
+
+webhooks:
+  enabled: false
+  allow_time_expiration: false 
