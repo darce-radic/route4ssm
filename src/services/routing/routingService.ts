@@ -1,4 +1,5 @@
 import { logger } from '../../utils/logger';
+import { routingConfig } from '../../config/routing.config';
 
 export interface Coordinate {
   latitude: number;
@@ -55,6 +56,79 @@ export interface RoutingConfig {
   };
 }
 
+// Type definitions for API responses
+interface OpenRouteResponse {
+  features?: Array<{
+    properties?: {
+      summary?: {
+        distance?: number;
+        duration?: number;
+      };
+      segments?: Array<{
+        distance?: number;
+        duration?: number;
+      }>;
+    };
+    geometry?: any;
+  }>;
+}
+
+interface ArcGISResponse {
+  error?: {
+    message?: string;
+  };
+  routes?: {
+    features?: Array<{
+      attributes?: {
+        Total_Length?: number;
+        Total_Time?: number;
+      };
+      geometry?: any;
+    }>;
+  };
+}
+
+interface MapboxResponse {
+  code?: string;
+  message?: string;
+  trips?: Array<{
+    distance?: number;
+    duration?: number;
+    geometry?: any;
+  }>;
+  routes?: Array<{
+    distance?: number;
+    duration?: number;
+    geometry?: any;
+  }>;
+}
+
+interface GoogleResponse {
+  status?: string;
+  error_message?: string;
+  routes?: Array<{
+    legs?: Array<{
+      distance?: {
+        value?: number;
+      };
+      duration?: {
+        value?: number;
+      };
+    }>;
+  }>;
+}
+
+interface HereResponse {
+  routes?: Array<{
+    sections?: Array<{
+      summary?: {
+        length?: number;
+        duration?: number;
+      };
+    }>;
+  }>;
+}
+
 export class RoutingService {
   private config: RoutingConfig;
 
@@ -84,7 +158,8 @@ export class RoutingService {
           throw new Error(`Unsupported routing provider: ${targetProvider}`);
       }
     } catch (error) {
-      logger.error('Routing failed', { provider: targetProvider, error: error.message });
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      logger.error('Routing failed', { provider: targetProvider, error: errorMessage });
       
       // Fallback to default provider if different from current
       if (provider && provider !== this.config.defaultProvider) {
@@ -97,7 +172,7 @@ export class RoutingService {
         duration: 0,
         provider: targetProvider,
         success: false,
-        error: error.message
+        error: errorMessage
       };
     }
   }
@@ -132,7 +207,7 @@ export class RoutingService {
       throw new Error(`OpenRoute API error: ${response.status} - ${error}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as OpenRouteResponse;
     
     if (!data.features || data.features.length === 0) {
       throw new Error('No route found');
@@ -140,14 +215,14 @@ export class RoutingService {
 
     const feature = data.features[0];
     const properties = feature.properties;
-    const segments = properties.segments || [];
+    const segments = properties?.segments || [];
 
     return {
-      distance: properties.summary?.distance || 0,
-      duration: properties.summary?.duration || 0,
+      distance: properties?.summary?.distance || 0,
+      duration: properties?.summary?.duration || 0,
       geometry: feature.geometry,
       waypoints: request.waypoints,
-      legs: segments.map((segment: any) => ({
+      legs: segments.map((segment) => ({
         distance: segment.distance || 0,
         duration: segment.duration || 0
       })),
@@ -180,7 +255,7 @@ export class RoutingService {
       throw new Error(`ArcGIS API error: ${response.status} - ${error}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as ArcGISResponse;
     
     if (data.error) {
       throw new Error(`ArcGIS API error: ${data.error.message || 'Unknown error'}`);
@@ -194,8 +269,8 @@ export class RoutingService {
     const attributes = route.attributes;
     
     return {
-      distance: (attributes.Total_Length || 0) * 1000, // Convert km to meters
-      duration: (attributes.Total_Time || 0) * 60, // Convert minutes to seconds
+      distance: (attributes?.Total_Length || 0) * 1000, // Convert km to meters
+      duration: (attributes?.Total_Time || 0) * 60, // Convert minutes to seconds
       geometry: route.geometry,
       waypoints: request.waypoints,
       provider: 'arcgis',
@@ -240,7 +315,7 @@ export class RoutingService {
         throw new Error(`Mapbox API error: ${response.status} - ${error}`);
       }
 
-      const data = await response.json();
+      const data = await response.json() as MapboxResponse;
       
       if (data.code !== 'Ok') {
         throw new Error(`Mapbox API error: ${data.message || 'Unknown error'}`);
@@ -263,7 +338,7 @@ export class RoutingService {
         throw new Error(`Mapbox API error: ${response.status} - ${error}`);
       }
 
-      const data = await response.json();
+      const data = await response.json() as MapboxResponse;
       
       if (data.code !== 'Ok') {
         throw new Error(`Mapbox API error: ${data.message || 'Unknown error'}`);
@@ -279,10 +354,6 @@ export class RoutingService {
         duration: route.duration || 0,
         geometry: route.geometry,
         waypoints: request.waypoints,
-        legs: route.legs?.map((leg: any) => ({
-          distance: leg.distance || 0,
-          duration: leg.duration || 0
-        })),
         provider: 'mapbox',
         success: true
       };
@@ -297,22 +368,13 @@ export class RoutingService {
 
     const baseUrl = config.baseUrl || 'https://maps.googleapis.com/maps/api/directions/json';
     
-    const waypoints = request.waypoints.map(wp => `${wp.latitude},${wp.longitude}`);
-    const origin = waypoints[0];
-    const destination = waypoints[waypoints.length - 1];
-    const waypointsParam = waypoints.slice(1, -1).join('|');
-    
     const params = new URLSearchParams({
       key: config.apiKey,
-      origin,
-      destination,
-      mode: request.profile || 'driving',
+      origin: `${request.waypoints[0].latitude},${request.waypoints[0].longitude}`,
+      destination: `${request.waypoints[request.waypoints.length - 1].latitude},${request.waypoints[request.waypoints.length - 1].longitude}`,
+      waypoints: request.waypoints.slice(1, -1).map(wp => `${wp.latitude},${wp.longitude}`).join('|'),
       optimize: request.optimize ? 'true' : 'false'
     });
-
-    if (waypointsParam) {
-      params.append('waypoints', waypointsParam);
-    }
 
     const response = await fetch(`${baseUrl}?${params}`);
     
@@ -321,7 +383,7 @@ export class RoutingService {
       throw new Error(`Google API error: ${response.status} - ${error}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as GoogleResponse;
     
     if (data.status !== 'OK') {
       throw new Error(`Google API error: ${data.status} - ${data.error_message || 'Unknown error'}`);
@@ -332,13 +394,15 @@ export class RoutingService {
       throw new Error('No route found');
     }
 
-    const leg = route.legs?.[0];
-    
+    const legs = route.legs || [];
+    const totalDistance = legs.reduce((sum, leg) => sum + (leg.distance?.value || 0), 0);
+    const totalDuration = legs.reduce((sum, leg) => sum + (leg.duration?.value || 0), 0);
+
     return {
-      distance: leg?.distance?.value || 0,
-      duration: leg?.duration?.value || 0,
+      distance: totalDistance,
+      duration: totalDuration,
       waypoints: request.waypoints,
-      legs: route.legs?.map((leg: any) => ({
+      legs: legs.map(leg => ({
         distance: leg.distance?.value || 0,
         duration: leg.duration?.value || 0
       })),
@@ -355,46 +419,36 @@ export class RoutingService {
 
     const baseUrl = config.baseUrl || 'https://router.hereapi.com/v8/routes';
     
-    const waypoints = request.waypoints.map(wp => `geo!${wp.latitude},${wp.longitude}`);
-    
     const params = new URLSearchParams({
       apiKey: config.apiKey,
-      transportMode: request.profile || 'car',
-      return: 'summary,travelSummary,polyline',
-      routingMode: request.optimize ? 'fast' : 'balanced'
+      transportMode: 'car',
+      origin: `${request.waypoints[0].latitude},${request.waypoints[0].longitude}`,
+      destination: `${request.waypoints[request.waypoints.length - 1].latitude},${request.waypoints[request.waypoints.length - 1].longitude}`,
+      via: request.waypoints.slice(1, -1).map(wp => `${wp.latitude},${wp.longitude}`).join('!'),
+      return: 'summary,polyline'
     });
 
-    const body = {
-      origin: waypoints[0],
-      destination: waypoints[waypoints.length - 1],
-      via: waypoints.slice(1, -1)
-    };
-
-    const response = await fetch(`${baseUrl}?${params}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(body)
-    });
+    const response = await fetch(`${baseUrl}?${params}`);
     
     if (!response.ok) {
       const error = await response.text();
       throw new Error(`HERE API error: ${response.status} - ${error}`);
     }
 
-    const data = await response.json();
+    const data = await response.json() as HereResponse;
     
     if (!data.routes || data.routes.length === 0) {
       throw new Error('No route found');
     }
 
     const route = data.routes[0];
-    const summary = route.sections?.[0]?.travelSummary;
-    
+    const sections = route.sections || [];
+    const totalDistance = sections.reduce((sum, section) => sum + (section.summary?.length || 0), 0);
+    const totalDuration = sections.reduce((sum, section) => sum + (section.summary?.duration || 0), 0);
+
     return {
-      distance: summary?.length || 0,
-      duration: summary?.duration || 0,
+      distance: totalDistance,
+      duration: totalDuration,
       waypoints: request.waypoints,
       provider: 'here',
       success: true

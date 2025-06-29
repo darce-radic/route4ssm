@@ -1,283 +1,272 @@
-# Route4SSM Deployment Guide for Portainer
+# Route4SSM Deployment Guide
 
-This guide will help you deploy the Route4SSM route optimization application using Portainer.
+## 🚨 **Critical Gaps Found & Fixed**
 
-## 🚀 Quick Deployment
+### 1. **TypeScript Compilation Issues** ✅ FIXED
+- **Issue**: Multiple TypeScript errors in routing service preventing build
+- **Fix**: Added proper type definitions for API responses and error handling
+- **Status**: Backend now compiles successfully
 
-### Prerequisites
-- Docker and Docker Compose installed on your server
-- Portainer installed and running
-- Access to your server's web interface
+### 2. **Missing Database Infrastructure** ✅ FIXED
+- **Issue**: No PostgreSQL or Redis services in Docker Compose
+- **Fix**: Added PostgreSQL and Redis services with proper health checks
+- **Status**: Database infrastructure now included
 
-### Option 1: Deploy via Portainer Web Interface (Recommended)
+### 3. **Frontend Build Process** ✅ FIXED
+- **Issue**: Missing React dependencies and build configuration
+- **Fix**: Added Vite configuration, proper dependencies, and multi-stage Docker build
+- **Status**: Frontend can now be built and served properly
 
-1. **Access Portainer**
-   - Open your web browser and navigate to your Portainer instance
-   - Log in with your credentials
+### 4. **API Endpoint Mismatches** ✅ FIXED
+- **Issue**: Frontend calling `/api/routes/optimize` but backend has `/api/route-optimization`
+- **Fix**: Updated frontend API calls to match backend routes
+- **Status**: API endpoints now aligned
 
-2. **Create a New Stack**
-   - In the Portainer dashboard, go to **Stacks** section
-   - Click **Add stack**
+## 📋 **Production Deployment Checklist**
 
-3. **Configure the Stack**
-   - **Name**: `route4ssm`
-   - **Build method**: Select **Web editor**
-   - Copy and paste the contents of `docker-compose.yml` into the editor
+### Pre-Deployment Setup
 
-4. **Deploy the Stack**
-   - Click **Deploy the stack**
-   - Wait for the deployment to complete
+- [ ] **Environment Configuration**
+  - [ ] Copy `env.example` to `.env` and configure all variables
+  - [ ] Set up API keys for routing services (OpenRoute, ArcGIS, MapBox, Google, HERE)
+  - [ ] Configure database credentials
+  - [ ] Set up Redis connection details
+  - [ ] Configure JWT secret for authentication
 
-### Option 2: Deploy via Git Repository
+- [ ] **Database Setup**
+  - [ ] Ensure PostgreSQL is accessible
+  - [ ] Verify Redis is running
+  - [ ] Test database connections
 
-1. **In Portainer Stacks**
-   - Click **Add stack**
-   - **Name**: `route4ssm`
-   - **Build method**: Select **Repository**
-   - **Repository URL**: `https://github.com/yourusername/route4ssm.git`
-   - **Repository reference**: `main` (or your preferred branch)
-   - **Compose path**: `docker-compose.yml`
+- [ ] **Authentication Setup**
+  - [ ] Configure Hanko authentication service
+  - [ ] Set up proper CORS settings
+  - [ ] Test authentication flow
 
-2. **Deploy**
-   - Click **Deploy the stack**
+### Docker Deployment
 
-## 🔧 Configuration Options
+- [ ] **Build Images**
+  ```bash
+  # Build backend
+  docker build -f Dockerfile.backend -t route4ssm-backend .
+  
+  # Build frontend
+  cd web-client
+  docker build -t route4ssm-frontend .
+  cd ..
+  ```
 
-### Environment Variables
+- [ ] **Start Services**
+  ```bash
+  # Start all services
+  docker-compose up -d
+  
+  # Check service health
+  docker-compose ps
+  ```
 
-You can customize the deployment by adding environment variables:
+- [ ] **Verify Health Checks**
+  ```bash
+  # Backend health
+  curl http://localhost:3009/health
+  
+  # Frontend health
+  curl http://localhost:8080/health
+  
+  # Database health
+  docker-compose exec postgres pg_isready -U route4ssm
+  
+  # Redis health
+  docker-compose exec redis redis-cli ping
+  ```
 
-```yaml
-services:
-  backend:
-    environment:
-      - NODE_ENV=production
-      - PORT=3009
-      - LOG_LEVEL=info
+### Production Configuration
 
-  frontend:
-    environment:
-      - NODE_ENV=production
-      - PORT=8080
-      - BACKEND_URL=http://backend:3009
-```
+- [ ] **SSL/TLS Setup**
+  - [ ] Configure SSL certificates
+  - [ ] Update nginx configuration for HTTPS
+  - [ ] Set up automatic redirects from HTTP to HTTPS
 
-### Port Configuration
+- [ ] **Security Hardening**
+  - [ ] Review and update security headers
+  - [ ] Configure rate limiting
+  - [ ] Set up proper firewall rules
+  - [ ] Enable CORS restrictions
 
-Default ports:
-- **Frontend**: 8080
-- **Backend**: 3009
-- **Nginx** (if enabled): 80, 443
+- [ ] **Monitoring & Logging**
+  - [ ] Set up application monitoring
+  - [ ] Configure log aggregation
+  - [ ] Set up alerting for service failures
 
-To change ports, modify the `ports` section in `docker-compose.yml`:
+### Testing Checklist
 
-```yaml
-services:
-  frontend:
-    ports:
-      - "3000:8080"  # External:Internal
-```
+- [ ] **API Testing**
+  - [ ] Test health endpoints
+  - [ ] Verify route optimization endpoints
+  - [ ] Test authentication flow
+  - [ ] Validate error handling
 
-## 🌐 Production Deployment
+- [ ] **Frontend Testing**
+  - [ ] Test map loading and interaction
+  - [ ] Verify route optimization UI
+  - [ ] Test responsive design
+  - [ ] Validate API integration
 
-### With Nginx Reverse Proxy
+- [ ] **Integration Testing**
+  - [ ] Test end-to-end optimization flow
+  - [ ] Verify database persistence
+  - [ ] Test job queue functionality
+  - [ ] Validate routing service integration
 
-For production deployment with SSL and load balancing:
+## 🐳 **Docker Compose Services**
 
-1. **Enable Nginx service** by removing the `profiles` section:
-```yaml
-nginx:
-  image: nginx:alpine
-  # ... other config
-  # Remove this line:
-  # profiles:
-  #   - production
-```
+### Services Overview
 
-2. **Configure SSL certificates**:
-   - Create `ssl/` directory
-   - Add your SSL certificates:
-     - `ssl/cert.pem` (SSL certificate)
-     - `ssl/key.pem` (Private key)
+1. **postgres** (PostgreSQL Database)
+   - Port: 5432
+   - Health check: `pg_isready`
+   - Volume: `postgres_data`
 
-3. **Update nginx.conf**:
-   - Uncomment the HTTPS server block
-   - Update `server_name` with your domain
+2. **redis** (Redis Cache/Queue)
+   - Port: 6379
+   - Health check: `redis-cli ping`
+   - Volume: `redis_data`
 
-4. **Deploy with production profile**:
+3. **backend** (Node.js API)
+   - Port: 3009
+   - Health check: HTTP `/health`
+   - Depends on: postgres, redis
+
+4. **frontend** (React Web App)
+   - Port: 8080
+   - Health check: HTTP `/health`
+   - Depends on: backend
+
+5. **nginx** (Reverse Proxy - Production)
+   - Ports: 80, 443
+   - Depends on: frontend, backend
+   - Profile: production
+
+## 🔧 **Environment Variables**
+
+### Required Variables
+
 ```bash
-docker-compose --profile production up -d
+# Database
+DB_HOST=postgres
+DB_PORT=5432
+DB_USER=route4ssm
+DB_PASSWORD=route4ssm_password
+DB_NAME=route4ssm
+
+# Redis
+REDIS_HOST=redis
+REDIS_PORT=6379
+
+# Routing APIs (at least one required)
+OPENROUTE_API_KEY=your-key
+ARCGIS_API_KEY=your-key
+MAPBOX_ACCESS_TOKEN=your-token
+GOOGLE_API_KEY=your-key
+HERE_API_KEY=your-key
+
+# Server
+PORT=3009
+NODE_ENV=production
+
+# Authentication
+HANKO_API_URL=http://localhost:8000
+JWT_SECRET=your-secret
 ```
 
-### Without Nginx (Direct Access)
+## 🚀 **Quick Start Commands**
 
-For simple deployments without reverse proxy:
+```bash
+# Clone and setup
+git clone <repository>
+cd route4ssm
+cp env.example .env
+# Edit .env with your configuration
 
-1. **Remove nginx service** from `docker-compose.yml`
-2. **Update frontend ports** to expose directly:
-```yaml
-frontend:
-  ports:
-    - "80:8080"  # Serve on port 80
+# Build and start
+docker-compose up -d
+
+# Check status
+docker-compose ps
+docker-compose logs -f
+
+# Access services
+# Frontend: http://localhost:8080
+# Backend API: http://localhost:3009
+# Health: http://localhost:3009/health
 ```
 
-## 📊 Monitoring and Health Checks
-
-The application includes built-in health checks:
-
-- **Frontend**: `http://your-server:8080/health`
-- **Backend**: `http://your-server:3009/health`
-
-### Viewing Logs in Portainer
-
-1. Go to **Containers** in Portainer
-2. Click on `route4ssm-frontend` or `route4ssm-backend`
-3. Click **Logs** tab to view real-time logs
-
-### Container Status
-
-- **Green**: Healthy and running
-- **Yellow**: Starting up
-- **Red**: Failed or unhealthy
-
-## 🔒 Security Considerations
-
-### Production Security Checklist
-
-- [ ] Use HTTPS with valid SSL certificates
-- [ ] Configure firewall rules
-- [ ] Use non-root containers (already configured)
-- [ ] Set up proper environment variables
-- [ ] Configure rate limiting (nginx)
-- [ ] Regular security updates
-
-### Environment Variables for Security
-
-```yaml
-services:
-  backend:
-    environment:
-      - NODE_ENV=production
-      - CORS_ORIGIN=https://yourdomain.com
-      - RATE_LIMIT_ENABLED=true
-```
-
-## 🛠️ Troubleshooting
+## 🔍 **Troubleshooting**
 
 ### Common Issues
 
-1. **Port Already in Use**
-   - Check if ports 8080/3009 are available
-   - Change ports in docker-compose.yml
+1. **Build Failures**
+   - Ensure all dependencies are installed
+   - Check TypeScript compilation
+   - Verify Docker build context
 
-2. **Container Won't Start**
-   - Check logs: `docker logs route4ssm-backend`
-   - Verify environment variables
-   - Check disk space
-
-3. **Health Check Failures**
-   - Ensure curl is installed in containers
-   - Check if services are responding
-   - Verify network connectivity
-
-4. **Frontend Can't Connect to Backend**
-   - Verify BACKEND_URL environment variable
-   - Check if backend container is healthy
+2. **Database Connection Issues**
+   - Verify PostgreSQL is running
+   - Check connection credentials
    - Ensure network connectivity
 
-### Debug Commands
+3. **API Integration Problems**
+   - Verify routing service API keys
+   - Check CORS configuration
+   - Test API endpoints directly
+
+4. **Frontend Issues**
+   - Check browser console for errors
+   - Verify API proxy configuration
+   - Test ArcGIS map loading
+
+### Logs and Debugging
 
 ```bash
-# Check container status
-docker ps -a
+# View all logs
+docker-compose logs
 
-# View logs
-docker logs route4ssm-frontend
-docker logs route4ssm-backend
+# View specific service logs
+docker-compose logs backend
+docker-compose logs frontend
 
-# Check network
-docker network ls
-docker network inspect route4ssm_route4ssm-network
-
-# Access container shell
-docker exec -it route4ssm-backend sh
-```
-
-## 📈 Scaling
-
-### Horizontal Scaling
-
-To scale the backend service:
-
-1. **In Portainer**:
-   - Go to **Services** (if using Swarm)
-   - Select the backend service
-   - Click **Scale** and set desired replicas
-
-2. **Or via docker-compose**:
-```yaml
-services:
-  backend:
-    deploy:
-      replicas: 3
-```
-
-### Load Balancing
-
-With nginx enabled, requests are automatically load balanced across backend instances.
-
-## 🔄 Updates and Maintenance
-
-### Updating the Application
-
-1. **Pull latest changes**:
-```bash
-git pull origin main
-```
-
-2. **Rebuild and restart**:
-   - In Portainer: **Stacks** → **route4ssm** → **Editor** → **Update the stack**
-   - Or via command line: `docker-compose up -d --build`
-
-### Backup and Restore
-
-1. **Backup data**:
-```bash
-docker run --rm -v route4ssm_route4ssm-data:/data -v $(pwd):/backup alpine tar czf /backup/backup.tar.gz /data
-```
-
-2. **Restore data**:
-```bash
-docker run --rm -v route4ssm_route4ssm-data:/data -v $(pwd):/backup alpine tar xzf /backup/backup.tar.gz -C /
-```
-
-## 📞 Support
-
-For issues or questions:
-- Check the logs in Portainer
-- Review this deployment guide
-- Check the main README.md for application details
-
-## 🎯 Quick Start Commands
-
-```bash
-# Deploy the stack
-docker-compose up -d
-
-# View logs
+# Follow logs in real-time
 docker-compose logs -f
 
-# Stop the stack
-docker-compose down
-
-# Restart services
-docker-compose restart
-
-# Update and rebuild
-docker-compose up -d --build
+# Access service shell
+docker-compose exec backend sh
+docker-compose exec postgres psql -U route4ssm
 ```
 
-Your Route4SSM application should now be accessible at:
-- **Frontend**: `http://your-server:8080`
-- **Backend API**: `http://your-server:3009`
-- **Health Check**: `http://your-server:8080/health` 
+## 📊 **Performance Considerations**
+
+- **Database**: Consider connection pooling for high traffic
+- **Redis**: Monitor memory usage and implement eviction policies
+- **API**: Implement rate limiting and caching
+- **Frontend**: Enable gzip compression and CDN for static assets
+
+## 🔒 **Security Best Practices**
+
+- Use strong passwords for database and Redis
+- Implement proper authentication and authorization
+- Enable HTTPS in production
+- Regular security updates for dependencies
+- Monitor for suspicious activities
+- Implement proper input validation
+
+## 📈 **Scaling Considerations**
+
+- **Horizontal Scaling**: Use load balancers for multiple backend instances
+- **Database**: Consider read replicas for high read loads
+- **Caching**: Implement Redis clustering for high availability
+- **Monitoring**: Set up comprehensive monitoring and alerting
+
+---
+
+**Last Updated**: December 2024
+**Version**: 1.0.0 

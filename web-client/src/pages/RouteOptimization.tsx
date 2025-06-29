@@ -69,7 +69,7 @@ const RouteOptimization: React.FC = () => {
       setLoading(true);
       console.log('📤 Sending optimization request to API...');
       
-      const response = await axios.post('/api/routes/optimize', {
+      const response = await axios.post('/api/route-optimization', {
         // Add your optimization parameters here
       });
       
@@ -94,14 +94,14 @@ const RouteOptimization: React.FC = () => {
     console.log(`🔍 Checking status for job: ${jobId}`);
     
     try {
-      const response = await axios.get(`/api/routes/optimize/${jobId}/status`);
+      const response = await axios.get(`/api/route-optimization/status/${jobId}`);
       console.log(`✅ Status response received:`);
       console.log(`   State: ${response.data.state}`);
       console.log(`   Progress: ${response.data.progress || 0}%`);
       
       if (response.data.state === 'completed') {
         console.log('🎉 Optimization completed! Fetching results...');
-        const result = await axios.get(`/api/routes/optimize/${jobId}/result`);
+        const result = await axios.get(`/api/route-optimization/result/${jobId}`);
         console.log('✅ Results received:', result.data);
         displayRoutes(result.data.routes);
         setLoading(false);
