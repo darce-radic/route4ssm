@@ -13,12 +13,20 @@ import HankoProfile from './components/HankoProfile';
 import ProtectedRoute from './components/ProtectedRoute';
 import LogoutButton from './components/LogoutButton';
 
+console.log('🚀 Route4SSM Web Client Starting...');
+console.log(`📅 Started at: ${new Date().toISOString()}`);
+console.log(`🌍 Environment: ${import.meta.env.MODE}`);
+console.log(`🔧 API URL: ${import.meta.env.VITE_API_URL || 'http://localhost:3009'}`);
+
 const PrivateRoute = ({ children }: { children: React.ReactNode }) => {
   const { isAuthenticated } = useAuth();
+  console.log(`🔐 PrivateRoute - Authentication status: ${isAuthenticated}`);
   return isAuthenticated ? children : <Navigate to="/login" />;
 };
 
 function App() {
+  console.log('🎨 App component rendering...');
+  
   return (
     <ThemeProvider theme={theme}>
       <CssBaseline />
@@ -54,5 +62,7 @@ function App() {
     </ThemeProvider>
   );
 }
+
+console.log('✅ App component loaded successfully');
 
 export default App; 

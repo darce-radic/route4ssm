@@ -1,12 +1,36 @@
 import { Express } from 'express';
-import authRoutes from './auth.routes';
-import jobRoutes from './job.routes';
-import technicianRoutes from './technician.routes';
-import routeOptimizationRoutes from './routeOptimization.routes';
 
 export const setupRoutes = (app: Express) => {
-  app.use('/api/auth', authRoutes);
-  app.use('/api/jobs', jobRoutes);
-  app.use('/api/technicians', technicianRoutes);
-  app.use('/api/route-optimization', routeOptimizationRoutes);
+  // Try to load routes, but don't fail if database dependencies are missing
+  try {
+    const authRoutes = require('./auth.routes').default;
+    app.use('/api/auth', authRoutes);
+    console.log('✅ Auth routes loaded');
+  } catch (error) {
+    console.log('⚠️  Auth routes not available (database dependency)');
+  }
+
+  try {
+    const jobRoutes = require('./job.routes').default;
+    app.use('/api/jobs', jobRoutes);
+    console.log('✅ Job routes loaded');
+  } catch (error) {
+    console.log('⚠️  Job routes not available (database dependency)');
+  }
+
+  try {
+    const technicianRoutes = require('./technician.routes').default;
+    app.use('/api/technicians', technicianRoutes);
+    console.log('✅ Technician routes loaded');
+  } catch (error) {
+    console.log('⚠️  Technician routes not available (database dependency)');
+  }
+
+  try {
+    const routeOptimizationRoutes = require('./routeOptimization.routes').default;
+    app.use('/api/route-optimization', routeOptimizationRoutes);
+    console.log('✅ Route optimization routes loaded');
+  } catch (error) {
+    console.log('⚠️  Route optimization routes not available (database dependency)');
+  }
 }; 

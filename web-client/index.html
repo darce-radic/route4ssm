@@ -2,12 +2,1309 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Route4SSM</title>
+    <title>Route4SSM - Route Optimization System</title>
+    
+    <!-- Load Calcite Design System -->
+    <script
+      type="module"
+      src="https://js.arcgis.com/calcite-components/3.2.1/calcite.esm.js"></script>
+
+    <!-- Placeholder script to help ArcGIS find DOM reference -->
+    <script></script>
+
+    <!-- Load the JavaScript Maps SDK core API -->
+    <link rel="stylesheet" href="https://js.arcgis.com/4.33/esri/themes/light/main.css" />
+    <script src="https://js.arcgis.com/4.33/"></script>
+
+    <!-- Load the JavaScript Maps SDK Map components -->
+    <script
+      type="module"
+      src="https://js.arcgis.com/4.33/map-components/"></script>
+
+    <!-- Ensure ArcGIS is loaded before proceeding -->
+    <script>
+      // Wait for ArcGIS to be fully loaded
+      function waitForArcGIS() {
+        return new Promise((resolve) => {
+          const checkArcGIS = () => {
+            if (typeof $arcgis !== 'undefined' && typeof window.require !== 'undefined') {
+              resolve();
+            } else {
+              setTimeout(checkArcGIS, 100);
+            }
+          };
+          checkArcGIS();
+        });
+      }
+      
+      // Mark ArcGIS as ready when loaded
+      window.arcgisReady = false;
+      waitForArcGIS().then(() => {
+        window.arcgisReady = true;
+        console.log('✅ ArcGIS loaded successfully');
+      });
+    </script>
+
+    <!-- Custom CSS -->
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        font-family: 'Avenir Next', 'Helvetica Neue', Arial, sans-serif;
+      }
+
+      #app {
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+      }
+
+      .header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 1rem 2rem;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        z-index: 1000;
+      }
+
+      .header h1 {
+        margin: 0;
+        font-size: 1.8rem;
+        font-weight: 600;
+      }
+
+      .header p {
+        margin: 0.5rem 0 0 0;
+        opacity: 0.9;
+        font-size: 0.9rem;
+      }
+
+      .main-content {
+        flex: 1;
+        display: flex;
+        overflow: hidden;
+      }
+
+      .sidebar {
+        width: 400px;
+        background: #f8f9fa;
+        border-right: 1px solid #e9ecef;
+        display: flex;
+        flex-direction: column;
+        overflow-y: auto;
+      }
+
+      .map-container {
+        flex: 1;
+        position: relative;
+        background: #f8f9fa;
+        border-radius: 8px;
+        overflow: hidden;
+        min-height: 400px;
+      }
+
+      .control-panel {
+        padding: 1.5rem;
+        border-bottom: 1px solid #e9ecef;
+      }
+
+      .control-panel h3 {
+        margin: 0 0 1rem 0;
+        color: #495057;
+        font-size: 1.1rem;
+      }
+
+      .form-group {
+        margin-bottom: 1rem;
+      }
+
+      .form-group label {
+        display: block;
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+        color: #495057;
+      }
+
+      .form-group input,
+      .form-group select,
+      .form-group textarea {
+        width: 100%;
+        padding: 0.5rem;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        font-size: 0.9rem;
+      }
+
+      .form-group textarea {
+        height: 80px;
+        resize: vertical;
+      }
+
+      .btn {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: none;
+        padding: 0.75rem 1.5rem;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        font-weight: 500;
+        transition: all 0.2s ease;
+      }
+
+      .btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+      }
+
+      .btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+      }
+
+      .results-panel {
+        flex: 1;
+        padding: 1.5rem;
+        overflow-y: auto;
+      }
+
+      .results-panel h3 {
+        margin: 0 0 1rem 0;
+        color: #495057;
+        font-size: 1.1rem;
+      }
+
+      .result-card {
+        background: white;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 1rem;
+        margin-bottom: 1rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+      }
+
+      .result-card h4 {
+        margin: 0 0 0.5rem 0;
+        color: #495057;
+        font-size: 1rem;
+      }
+
+      .result-card p {
+        margin: 0.25rem 0;
+        color: #6c757d;
+        font-size: 0.9rem;
+      }
+
+      .metric {
+        display: inline-block;
+        background: #e3f2fd;
+        color: #1976d2;
+        padding: 0.25rem 0.5rem;
+        border-radius: 4px;
+        font-size: 0.8rem;
+        margin: 0.25rem 0.25rem 0.25rem 0;
+      }
+
+      .loading {
+        display: none;
+        text-align: center;
+        padding: 2rem;
+        color: #6c757d;
+      }
+
+      .loading.show {
+        display: block;
+      }
+
+      .error {
+        background: #f8d7da;
+        color: #721c24;
+        padding: 1rem;
+        border-radius: 4px;
+        margin: 1rem 0;
+        display: none;
+      }
+
+      .error.show {
+        display: block;
+      }
+
+      .success {
+        background: #d4edda;
+        color: #155724;
+        padding: 1rem;
+        border-radius: 4px;
+        margin: 1rem 0;
+        display: none;
+      }
+
+      .success.show {
+        display: block;
+      }
+
+      .map-widgets {
+        position: absolute;
+        top: 20px;
+        right: 20px;
+        z-index: 1000;
+      }
+
+      .legend {
+        position: absolute;
+        bottom: 20px;
+        left: 20px;
+        background: white;
+        padding: 1rem;
+        border-radius: 8px;
+        box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        z-index: 1000;
+      }
+
+      .legend h4 {
+        margin: 0 0 0.5rem 0;
+        font-size: 0.9rem;
+      }
+
+      .legend-item {
+        display: flex;
+        align-items: center;
+        margin: 0.25rem 0;
+        font-size: 0.8rem;
+      }
+
+      .legend-color {
+        width: 16px;
+        height: 16px;
+        border-radius: 50%;
+        margin-right: 0.5rem;
+      }
+
+      /* Loading spinner for map */
+      .map-loading {
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        background: white;
+        padding: 2rem;
+        border-radius: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        z-index: 1000;
+        text-align: center;
+      }
+
+      .map-loading.hidden {
+        display: none;
+      }
+
+      .toggle-map-btn {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        z-index: 1000;
+        background: rgba(255, 255, 255, 0.95);
+        border: 2px solid #007bff;
+        border-radius: 6px;
+        padding: 10px 15px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.3s ease;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        color: #007bff;
+      }
+      
+      .toggle-map-btn:hover {
+        background: rgba(255, 255, 255, 1);
+        border-color: #0056b3;
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+        color: #0056b3;
+      }
+      
+      .toggle-map-btn:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+      }
+      
+      .map-container.hidden {
+        display: none;
+      }
+      
+      .results-container.expanded {
+        flex: 1;
+        margin-left: 0;
+      }
+
+      /* Tabbed Interface Styles */
+      .results-container {
+        width: 450px;
+        background: #f8f9fa;
+        border-left: 1px solid #e9ecef;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+
+      .tab-navigation {
+        display: flex;
+        background: white;
+        border-bottom: 1px solid #e9ecef;
+        overflow-x: auto;
+      }
+
+      .tab-button {
+        flex: 1;
+        padding: 12px 16px;
+        background: transparent;
+        border: none;
+        border-bottom: 3px solid transparent;
+        color: #6c757d;
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        white-space: nowrap;
+        min-width: 0;
+      }
+
+      .tab-button:hover {
+        background: #f8f9fa;
+        color: #495057;
+      }
+
+      .tab-button.active {
+        color: #007bff;
+        border-bottom-color: #007bff;
+        background: #f8f9fa;
+      }
+
+      .tab-content {
+        flex: 1;
+        overflow-y: auto;
+        background: white;
+      }
+
+      .tab-panel {
+        display: none;
+        padding: 1.5rem;
+        height: 100%;
+        overflow-y: auto;
+      }
+
+      .tab-panel.active {
+        display: block;
+      }
+
+      .panel-header {
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid #e9ecef;
+      }
+
+      .panel-header h3 {
+        margin: 0 0 0.5rem 0;
+        color: #495057;
+        font-size: 1.2rem;
+      }
+
+      .panel-header p {
+        margin: 0;
+        color: #6c757d;
+        font-size: 0.9rem;
+      }
+
+      .form-section {
+        margin-bottom: 1.5rem;
+      }
+
+      .form-section h4 {
+        margin: 0 0 0.75rem 0;
+        color: #495057;
+        font-size: 1rem;
+        font-weight: 600;
+      }
+
+      .scenario-buttons {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+      }
+
+      .scenario-btn {
+        padding: 0.75rem;
+        background: #f8f9fa;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        color: #495057;
+        font-size: 0.9rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .scenario-btn:hover {
+        background: #e9ecef;
+        border-color: #adb5bd;
+        transform: translateY(-1px);
+      }
+
+      .scenario-btn.active {
+        background: #007bff;
+        color: white;
+        border-color: #007bff;
+      }
+
+      #jsonInput {
+        width: 100%;
+        padding: 0.75rem;
+        border: 1px solid #ced4da;
+        border-radius: 6px;
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        font-size: 0.85rem;
+        line-height: 1.4;
+        resize: vertical;
+        min-height: 120px;
+      }
+
+      .settings-grid {
+        display: grid;
+        gap: 1rem;
+      }
+
+      .setting-item {
+        display: flex;
+        flex-direction: column;
+      }
+
+      .setting-item label {
+        margin-bottom: 0.5rem;
+        font-weight: 500;
+        color: #495057;
+        font-size: 0.9rem;
+      }
+
+      .setting-item input,
+      .setting-item select {
+        padding: 0.5rem;
+        border: 1px solid #ced4da;
+        border-radius: 4px;
+        font-size: 0.9rem;
+      }
+
+      .action-buttons {
+        display: flex;
+        gap: 0.75rem;
+        margin-top: 1.5rem;
+      }
+
+      .primary-btn {
+        flex: 1;
+        padding: 0.75rem 1rem;
+        background: linear-gradient(135deg, #007bff 0%, #0056b3 100%);
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .primary-btn:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+      }
+
+      .secondary-btn {
+        padding: 0.75rem 1rem;
+        background: #6c757d;
+        color: white;
+        border: none;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        font-weight: 500;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .secondary-btn:hover {
+        background: #5a6268;
+        transform: translateY(-1px);
+      }
+
+      /* Scenario Cards */
+      .scenario-cards {
+        display: grid;
+        gap: 1rem;
+      }
+
+      .scenario-card {
+        background: white;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 1.5rem;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        text-align: center;
+      }
+
+      .scenario-card:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        border-color: #007bff;
+      }
+
+      .scenario-icon {
+        font-size: 2rem;
+        margin-bottom: 0.75rem;
+      }
+
+      .scenario-card h4 {
+        margin: 0 0 0.5rem 0;
+        color: #495057;
+        font-size: 1.1rem;
+      }
+
+      .scenario-card p {
+        margin: 0 0 1rem 0;
+        color: #6c757d;
+        font-size: 0.9rem;
+      }
+
+      .scenario-stats {
+        display: flex;
+        justify-content: center;
+        gap: 1rem;
+        font-size: 0.8rem;
+        color: #6c757d;
+      }
+
+      /* Results Tab */
+      .no-results {
+        text-align: center;
+        padding: 3rem 1rem;
+        color: #6c757d;
+      }
+
+      .no-results-icon {
+        font-size: 3rem;
+        margin-bottom: 1rem;
+        opacity: 0.5;
+      }
+
+      .no-results h4 {
+        margin: 0 0 0.5rem 0;
+        color: #495057;
+      }
+
+      .no-results p {
+        margin: 0;
+        font-size: 0.9rem;
+      }
+
+      /* Settings Tab */
+      .settings-section {
+        margin-bottom: 2rem;
+      }
+
+      .settings-section h4 {
+        margin: 0 0 1rem 0;
+        color: #495057;
+        font-size: 1rem;
+        font-weight: 600;
+      }
+
+      /* Results Display Styles */
+      .results-summary {
+        margin-bottom: 2rem;
+      }
+
+      .results-summary h4 {
+        margin: 0 0 1rem 0;
+        color: #495057;
+        font-size: 1.1rem;
+      }
+
+      .metrics-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+      }
+
+      .metric-card {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        padding: 1rem;
+        text-align: center;
+      }
+
+      .metric-value {
+        font-size: 1.5rem;
+        font-weight: bold;
+        color: #007bff;
+        margin-bottom: 0.25rem;
+      }
+
+      .metric-label {
+        font-size: 0.8rem;
+        color: #6c757d;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+      }
+
+      .routes-details h4 {
+        margin: 0 0 1rem 0;
+        color: #495057;
+        font-size: 1.1rem;
+      }
+
+      .route-card {
+        background: white;
+        border: 1px solid #e9ecef;
+        border-radius: 8px;
+        margin-bottom: 1rem;
+        overflow: hidden;
+      }
+
+      .route-header {
+        background: #f8f9fa;
+        padding: 1rem;
+        border-bottom: 1px solid #e9ecef;
+      }
+
+      .route-header h5 {
+        margin: 0 0 0.5rem 0;
+        color: #495057;
+        font-size: 1rem;
+      }
+
+      .route-stats {
+        display: flex;
+        gap: 1rem;
+        font-size: 0.8rem;
+        color: #6c757d;
+      }
+
+      .route-jobs {
+        padding: 1rem;
+      }
+
+      .job-item {
+        display: flex;
+        align-items: flex-start;
+        padding: 0.5rem 0;
+        border-bottom: 1px solid #f8f9fa;
+      }
+
+      .job-item:last-child {
+        border-bottom: none;
+      }
+
+      .job-number {
+        background: #007bff;
+        color: white;
+        width: 24px;
+        height: 24px;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 0.8rem;
+        font-weight: bold;
+        margin-right: 0.75rem;
+        flex-shrink: 0;
+      }
+
+      .job-details {
+        flex: 1;
+        font-size: 0.9rem;
+      }
+
+      .job-details strong {
+        color: #495057;
+      }
+
+      .job-details small {
+        color: #6c757d;
+      }
+
+      /* Depot stop styling */
+      .depot-stop {
+        background: #f8f9fa;
+        border-left: 3px solid #28a745;
+      }
+
+      .depot-stop .job-number {
+        background: #28a745;
+        font-size: 1rem;
+      }
+
+      .depot-stop .job-details strong {
+        color: #28a745;
+      }
+
+      /* JSON Input Styles */
+      .json-input-container {
+        position: relative;
+      }
+
+      .json-input-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 0.5rem;
+        font-size: 0.9rem;
+        color: #495057;
+      }
+
+      .help-btn {
+        background: #6c757d;
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 0.25rem 0.5rem;
+        font-size: 0.8rem;
+        cursor: pointer;
+        transition: background 0.2s ease;
+      }
+
+      .help-btn:hover {
+        background: #5a6268;
+      }
+
+      /* Format Documentation Modal */
+      .format-modal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.5);
+        z-index: 10000;
+        overflow-y: auto;
+      }
+
+      .format-modal.show {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .format-content {
+        background: white;
+        border-radius: 8px;
+        padding: 2rem;
+        max-width: 800px;
+        max-height: 80vh;
+        overflow-y: auto;
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
+      }
+
+      .format-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid #e9ecef;
+      }
+
+      .format-header h3 {
+        margin: 0;
+        color: #495057;
+      }
+
+      .close-btn {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        cursor: pointer;
+        color: #6c757d;
+        padding: 0;
+        width: 30px;
+        height: 30px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .close-btn:hover {
+        color: #495057;
+      }
+
+      .format-section {
+        margin-bottom: 2rem;
+      }
+
+      .format-section h4 {
+        margin: 0 0 1rem 0;
+        color: #495057;
+        font-size: 1.1rem;
+      }
+
+      .code-block {
+        background: #f8f9fa;
+        border: 1px solid #e9ecef;
+        border-radius: 6px;
+        padding: 1rem;
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        font-size: 0.85rem;
+        line-height: 1.4;
+        overflow-x: auto;
+        margin: 1rem 0;
+      }
+
+      .field-description {
+        background: #e3f2fd;
+        border-left: 4px solid #2196f3;
+        padding: 1rem;
+        margin: 1rem 0;
+        border-radius: 0 4px 4px 0;
+      }
+
+      .field-description h5 {
+        margin: 0 0 0.5rem 0;
+        color: #1976d2;
+      }
+
+      .field-description p {
+        margin: 0;
+        font-size: 0.9rem;
+        color: #424242;
+      }
+
+      /* Responsive Design */
+      @media (max-width: 1200px) {
+        .results-container {
+          width: 400px;
+        }
+      }
+
+      @media (max-width: 768px) {
+        .main-container {
+          flex-direction: column;
+        }
+        
+        .map-container {
+          height: 300px;
+          min-height: 300px;
+        }
+        
+        .results-container {
+          width: 100%;
+          height: auto;
+        }
+        
+        .tab-navigation {
+          flex-wrap: wrap;
+        }
+        
+        .tab-button {
+          flex: 1 1 50%;
+          min-width: 120px;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.tsx"></script>
+    <div id="app">
+      <div class="header">
+        <h1>🚗 Route4SSM</h1>
+        <p>Advanced Route Optimization & Scheduling System</p>
+      </div>
+
+      <div class="main-container">
+        <!-- Left side: Map -->
+        <div class="map-container" id="mapContainer">
+          <div id="mapLoading" class="map-loading">
+            <p>🗺️ Loading ArcGIS Map...</p>
+            <p style="font-size: 0.8rem; color: #6c757d;">Please wait while the map initializes</p>
+          </div>
+          
+          <!-- Simple map container without web components -->
+          <div id="mapInnerContainer" style="width: 100%; height: 100%; position: relative; min-height: 400px;">
+            <div id="mapDiv" style="width: 100%; height: 100%; position: absolute; top: 0; left: 0;"></div>
+          </div>
+          
+          <!-- Map toggle button -->
+          <button id="toggleMapBtn" class="toggle-map-btn" onclick="toggleMap()">
+            🗺️ Hide Map
+          </button>
+        </div>
+
+        <!-- Right side: Tabbed Results -->
+        <div class="results-container" id="resultsContainer">
+          <!-- Tab Navigation -->
+          <div class="tab-navigation">
+            <button class="tab-button active" data-tab="optimization" onclick="switchTab('optimization')">
+              🚗 Optimization
+            </button>
+            <button class="tab-button" data-tab="scenarios" onclick="switchTab('scenarios')">
+              📋 Scenarios
+            </button>
+            <button class="tab-button" data-tab="results" onclick="switchTab('results')">
+              📊 Results
+            </button>
+            <button class="tab-button" data-tab="settings" onclick="switchTab('settings')">
+              ⚙️ Settings
+            </button>
+          </div>
+
+          <!-- Tab Content -->
+          <div class="tab-content">
+            <!-- Optimization Tab -->
+            <div id="optimization-tab" class="tab-panel active">
+              <div class="panel-header">
+                <h3>🚗 Route Optimization</h3>
+                <p>Configure and run route optimization algorithms</p>
+              </div>
+              
+              <div class="form-section">
+                <h4>Test Scenarios</h4>
+                <div class="scenario-buttons">
+                  <button onclick="loadScenario('small')" class="scenario-btn">Small Dataset</button>
+                  <button onclick="loadScenario('medium')" class="scenario-btn">Medium Dataset</button>
+                  <button onclick="loadScenario('large')" class="scenario-btn">Large Dataset</button>
+                  <button onclick="loadScenario('custom')" class="scenario-btn">Custom JSON</button>
+                </div>
+              </div>
+
+              <div class="form-section">
+                <h4>Custom JSON Input</h4>
+                <div class="json-input-container">
+                  <div class="json-input-header">
+                    <span>Paste your JSON data here...</span>
+                    <button onclick="showJsonFormat()" class="help-btn" title="Show JSON format">
+                      ❓ Format Help
+                    </button>
+                  </div>
+                  <textarea id="jsonInput" rows="8"></textarea>
+                </div>
+              </div>
+
+              <div class="form-section">
+                <h4>Optimization Settings</h4>
+                <div class="settings-grid">
+                  <div class="setting-item">
+                    <label for="algorithm">Algorithm:</label>
+                    <select id="algorithm">
+                      <option value="nearest-neighbor">Nearest Neighbor</option>
+                      <option value="genetic">Genetic Algorithm</option>
+                      <option value="ant-colony">Ant Colony</option>
+                    </select>
+                  </div>
+                  <div class="setting-item">
+                    <label for="maxIterations">Max Iterations:</label>
+                    <input type="number" id="maxIterations" value="1000" min="100" max="10000">
+                  </div>
+                  <div class="setting-item">
+                    <label for="timeLimit">Time Limit (s):</label>
+                    <input type="number" id="timeLimit" value="30" min="5" max="300">
+                  </div>
+                </div>
+              </div>
+
+              <div class="action-buttons">
+                <button onclick="runOptimization()" class="primary-btn">
+                  🚀 Run Optimization
+                </button>
+                <button onclick="clearResults()" class="secondary-btn">
+                  🗑️ Clear Results
+                </button>
+              </div>
+            </div>
+
+            <!-- Scenarios Tab -->
+            <div id="scenarios-tab" class="tab-panel">
+              <div class="panel-header">
+                <h3>📋 Test Scenarios</h3>
+                <p>Pre-configured datasets for testing optimization algorithms</p>
+              </div>
+              
+              <div class="scenario-cards">
+                <div class="scenario-card" onclick="loadScenario('small')">
+                  <div class="scenario-icon">🏠</div>
+                  <h4>Small Dataset</h4>
+                  <p>5 jobs, 2 technicians</p>
+                  <div class="scenario-stats">
+                    <span>⏱️ ~2s</span>
+                    <span>📍 5 locations</span>
+                  </div>
+                </div>
+                
+                <div class="scenario-card" onclick="loadScenario('medium')">
+                  <div class="scenario-icon">🏢</div>
+                  <h4>Medium Dataset</h4>
+                  <p>15 jobs, 4 technicians</p>
+                  <div class="scenario-stats">
+                    <span>⏱️ ~5s</span>
+                    <span>📍 15 locations</span>
+                  </div>
+                </div>
+                
+                <div class="scenario-card" onclick="loadScenario('large')">
+                  <div class="scenario-icon">🏭</div>
+                  <h4>Large Dataset</h4>
+                  <p>30 jobs, 8 technicians</p>
+                  <div class="scenario-stats">
+                    <span>⏱️ ~15s</span>
+                    <span>📍 30 locations</span>
+                  </div>
+                </div>
+                
+                <div class="scenario-card" onclick="loadScenario('custom')">
+                  <div class="scenario-icon">⚙️</div>
+                  <h4>Custom JSON</h4>
+                  <p>Upload your own data</p>
+                  <div class="scenario-stats">
+                    <span>📝 JSON format</span>
+                    <span>🔧 Flexible</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Results Tab -->
+            <div id="results-tab" class="tab-panel">
+              <div class="panel-header">
+                <h3>📊 Optimization Results</h3>
+                <p>View detailed results and performance metrics</p>
+              </div>
+              
+              <div id="resultsContent">
+                <div class="no-results">
+                  <div class="no-results-icon">📊</div>
+                  <h4>No Results Yet</h4>
+                  <p>Run an optimization to see results here</p>
+                </div>
+              </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div id="settings-tab" class="tab-panel">
+              <div class="panel-header">
+                <h3>⚙️ Application Settings</h3>
+                <p>Configure application preferences and API settings</p>
+              </div>
+              
+              <div class="settings-section">
+                <h4>API Configuration</h4>
+                <div class="setting-item">
+                  <label for="apiUrl">API Base URL:</label>
+                  <input type="url" id="apiUrl" value="http://localhost:3009" placeholder="http://localhost:3009">
+                </div>
+                <div class="setting-item">
+                  <label for="timeout">Request Timeout (ms):</label>
+                  <input type="number" id="timeout" value="30000" min="5000" max="120000">
+                </div>
+              </div>
+
+              <div class="settings-section">
+                <h4>Map Settings</h4>
+                <div class="setting-item">
+                  <label for="defaultZoom">Default Zoom Level:</label>
+                  <input type="number" id="defaultZoom" value="10" min="1" max="20">
+                </div>
+                <div class="setting-item">
+                  <label for="mapCenter">Default Center:</label>
+                  <input type="text" id="mapCenter" value="-122.4194, 37.7749" placeholder="longitude, latitude">
+                </div>
+              </div>
+
+              <div class="settings-section">
+                <h4>Display Options</h4>
+                <div class="setting-item">
+                  <label>
+                    <input type="checkbox" id="autoRefresh" checked>
+                    Auto-refresh results
+                  </label>
+                </div>
+                <div class="setting-item">
+                  <label>
+                    <input type="checkbox" id="showNotifications" checked>
+                    Show notifications
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- JSON Format Documentation Modal -->
+    <div id="formatModal" class="format-modal">
+      <div class="format-content">
+        <div class="format-header">
+          <h3>📋 JSON Input Format Documentation</h3>
+          <button class="close-btn" onclick="hideJsonFormat()">&times;</button>
+        </div>
+        
+        <div class="format-section">
+          <h4>🎯 Overview</h4>
+          <p>The route optimization API accepts JSON data with jobs and technicians. Coordinates can be provided in either array format <code>[longitude, latitude]</code> or object format <code>{"latitude": value, "longitude": value}</code>.</p>
+        </div>
+        
+        <div class="format-section">
+          <h4>📝 Complete Example</h4>
+          <div class="code-block">
+{
+  "jobs": [
+    {
+      "id": "job-1",
+      "coordinates": {"latitude": -31.9505, "longitude": 115.8605},
+      "address": "123 Test St, Perth WA 6000",
+      "time_window": {"start": "09:00", "end": "17:00"},
+      "service_time": 60,
+      "priority": 1,
+      "technician_id": "unassigned"
+    }
+  ],
+  "technicians": [
+    {
+      "id": "tech-1",
+      "name": "John Doe",
+      "coordinates": {"latitude": -31.9505, "longitude": 115.8605},
+      "address": "456 Home St, Perth WA 6000",
+      "start_time": "08:00",
+      "end_time": "18:00",
+      "skills": ["general"],
+      "capacity": 8
+    }
+  ]
+}
+          </div>
+        </div>
+        
+        <div class="format-section">
+          <h4>🏢 Job Object Fields</h4>
+          
+          <div class="field-description">
+            <h5>id (string, required)</h5>
+            <p>Unique identifier for the job</p>
+          </div>
+          
+          <div class="field-description">
+            <h5>coordinates (object/array, required)</h5>
+            <p>Location coordinates. Can be <code>{"latitude": value, "longitude": value}</code> or <code>[longitude, latitude]</code></p>
+          </div>
+          
+          <div class="field-description">
+            <h5>address (string, required)</h5>
+            <p>Human-readable address of the job location</p>
+          </div>
+          
+          <div class="field-description">
+            <h5>time_window (object, required)</h5>
+            <p>Time window when the job can be performed: <code>{"start": "HH:MM", "end": "HH:MM"}</code></p>
+          </div>
+          
+          <div class="field-description">
+            <h5>service_time (number, required)</h5>
+            <p>Time in minutes required to complete the job</p>
+          </div>
+          
+          <div class="field-description">
+            <h5>priority (number, required)</h5>
+            <p>Job priority (1 = highest, 3 = lowest)</p>
+          </div>
+          
+          <div class="field-description">
+            <h5>technician_id (string, optional)</h5>
+            <p>Pre-assigned technician ID or "unassigned" for optimization</p>
+          </div>
+        </div>
+        
+        <div class="format-section">
+          <h4>👷 Technician Object Fields</h4>
+          
+          <div class="field-description">
+            <h5>id (string, required)</h5>
+            <p>Unique identifier for the technician</p>
+          </div>
+          
+          <div class="field-description">
+            <h5>name (string, required)</h5>
+            <p>Technician's name</p>
+          </div>
+          
+          <div class="field-description">
+            <h5>coordinates (object/array, required)</h5>
+            <p>Starting location coordinates. Can be <code>{"latitude": value, "longitude": value}</code> or <code>[longitude, latitude]</code></p>
+          </div>
+          
+          <div class="field-description">
+            <h5>address (string, required)</h5>
+            <p>Technician's starting address</p>
+          </div>
+          
+          <div class="field-description">
+            <h5>start_time (string, required)</h5>
+            <p>Technician's work start time in "HH:MM" format</p>
+          </div>
+          
+          <div class="field-description">
+            <h5>end_time (string, required)</h5>
+            <p>Technician's work end time in "HH:MM" format</p>
+          </div>
+          
+          <div class="field-description">
+            <h5>skills (array, required)</h5>
+            <p>Array of skills the technician has (e.g., ["electrical", "plumbing"])</p>
+          </div>
+          
+          <div class="field-description">
+            <h5>capacity (number, required)</h5>
+            <p>Maximum number of jobs the technician can handle</p>
+          </div>
+        </div>
+        
+        <div class="format-section">
+          <h4>💡 Tips</h4>
+          <ul style="margin: 0; padding-left: 1.5rem;">
+            <li>Use "unassigned" for technician_id to let the algorithm assign jobs</li>
+            <li>Coordinates can be in decimal degrees (e.g., -31.9505, 115.8605)</li>
+            <li>Time windows should be in 24-hour format (e.g., "09:00", "17:00")</li>
+            <li>Priorities range from 1 (highest) to 3 (lowest)</li>
+            <li>Service times are in minutes</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Load app script after DOM is ready -->
+    <script type="module">
+      // Ensure DOM is completely ready before initializing
+      function startApp() {
+        // Additional delay to ensure all scripts are loaded
+        setTimeout(() => {
+          import('./app.js').then(module => {
+            if (module.initializeApp) {
+              module.initializeApp();
+            }
+          }).catch(error => {
+            console.error('Failed to load app:', error);
+          });
+        }, 1000); // Wait 1 second for all scripts to load
+      }
+      
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', startApp);
+      } else {
+        // DOM is already ready
+        startApp();
+      }
+    </script>
+    
+    <!-- Load tab functionality -->
+    <script src="tabs.js"></script>
   </body>
 </html> 
